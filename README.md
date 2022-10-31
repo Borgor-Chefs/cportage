@@ -1,24 +1,50 @@
-# Structure
+# About
 
-- `keys.py` is a shorthand remapping for keys, some of them don't reflect what is printed on the keyboard
-- `display.py` is a wrapper around the `curses.window` of sorts, this is mainly to handle data
-- `main.py` is the main script
+This program was made to easily (also graphically) change your USE flags for the system and individual packages.
 
-# Program Requirements
+## Features
 
-This program needs...
+At the time of writing this, these are the initial features that the program should have;
 
-- access to the user's `/etc/portage/package.use/` directory
-	- this is to write package specify USE flags
-		- e.g., if you were to edit the USE flags for `app-containers/docker` you would find the flags in `/etc/portage/package.use/app/containers`
-	- would need read & write perms
-- access to the system's `/var/db/pkg/` directory
-	- reading all of the packages and listing them on the screen
-	- would need read perms
-- access to the user's `/etc/portage/make.conf` file
-	- to display and change your global use flags
-	- would need read & write perms
+- the ability to graphically manage the global (`make.conf`) and individual package (`package.use/`) USE flags
+	- CRUD operations for individual (`package.use/`) flags
 
->Note that root access is **not required**, but what is required is some user that has access to these files/directories
->this hypothetical user should not be able to execute anything
+## Program Requirements
+
+This is a python program built atop the `portage` library developed by the Gentoo team and it should be installed by default.
+
+The rest are:
+
+- `urwid` - this is the graphical library being used
+
+## System Modifications
+
+- this program creates a new group called `cportage`
+	- you will need to **manually** add users to this group `usermod -aG <user> cportage`
+	- this group will have read & write permissions to various files and directories
+- this program changes the `make.conf` *file* into a *folder.*
+	- for users' sake, the old file will be backed up to `make.conf.old` and left in `/etc/portage/`
+	- it will also be copied to `/etc/portage/make.conf/main.conf`
+	- the `MAKEOPTS` will be moved into `/etc/portage/make.conf/make.conf`
+
+> See System (File) Requirements
+
+### System (File) Requirements
+
+This program requires `xxxrw-xxx <user> cportage` read & write access to;
+
+- the `/etc/portage/package.use/` directory.
+	- this includes subdirectories and subfiles
+- the `/etc/portage/make.conf/` **directory**
+
+> `make.conf` can be a directory, see `man make.conf`.
+> the files within this directory are summed together to form the usual `make.conf` file
+
+#### package.use
+
+something goes here
+
+#### make.conf
+
+something goes here
 
