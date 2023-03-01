@@ -4,18 +4,15 @@ This program was made to easily (also graphically) change your USE flags for the
 
 ## Features
 
-At the time of writing this, these are the initial features that the program should have;
-
-- the ability to graphically manage the global (`make.conf`) and individual package (`package.use/`) USE flags
-	- CRUD operations for individual (`package.use/`) flags
+- list all installed packages
+- query for packages
 
 ## Program Requirements
 
-This is a python program built atop the `portage` library developed by the Gentoo team and it should be installed by default.
+You'll need:
 
-The rest are:
-
-- `urwid` - this is the graphical library being used
+- `libncurses`
+- `libtinfo`
 
 ## System Modifications
 
