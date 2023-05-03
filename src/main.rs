@@ -12,20 +12,20 @@ fn main() {
 		initscr();
 		raw();
 
+        // the main window
+        let win: WINDOW = stdscr();
+
 		/* Allow for extended keyboard (like F1). */
-		keypad(stdscr(), true);
+		keypad(win, true);
 		noecho();
 
-		/* Status/help info. */
-		addstr("Use the arrow keys to move");
-		mvprintw(LINES() - 1, 0, "Press F1 to exit");
-		refresh();
-
-        let d = Display::new(stdscr(), String::from("Title"), random_data(50, 16));
+        // creating a display object from the main window
+        let d = Display::from_window(win, String::from("Title"), random_data(50, 16));
         d.draw();
 
-        getch();
+        wrefresh(win);
 
+        wgetch(win);
 		endwin();
 }
 
