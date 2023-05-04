@@ -1,13 +1,14 @@
 #![allow(dead_code)]
 
-extern crate ncurses;
+extern crate pancurses;
 
-use ncurses::*;
+use super::pad::Pad;
+use pancurses::*;
 
 #[derive(Debug)]
 pub struct Display {
-    parent: Option<Box<Display>>,
-	window: WINDOW,
+	parent: Option<Box<Display>>,
+	pad: Pad,
 	data: Vec<String>,
 	title: String,
 	xoffset: i32,
@@ -17,73 +18,91 @@ pub struct Display {
 }
 
 impl Display {
-	/// Creates a new [`Display`] object.
-    pub fn new(title: String, data: Vec<String>) -> Self {
+	/// Creates a new [`Display`] object, this acts as the root [`Display`].
+	pub fn new(win: &Window, title: String, data: Vec<String>) -> Self {
 		// getting max x& y
-		let mut x = 0;
-		let mut y = 0;
-		getmaxyx(stdscr(), &mut y, &mut x);
+		let (y, x) = win.get_max_yx();
+
+		// creating the pad object
+		let pad: Pad = match Pad::new(std::cmp::max(y, data.len() as i32), x / 3) {
+			Ok(p) => p,
+			Err(e) => {
+				endwin();
+				panic!("There was an error creating a pad\n{:?}", e);
+			}
+		};
 
 		// creating struct
-		Display {
-            parent: None,
-			window: stdscr(),
+		let d = Display {
+			parent: None,
+			pad,
 			data,
 			title,
 			xoffset: 0,
 			yoffset: 0,
-			xsize: x,
+			xsize: x / 3,
 			ysize: y,
-		}
-    }
+		};
 
-    /// Creates a new [`Display`] object from a [`WINDOW`].
-    pub fn from_window(win: WINDOW, title: String, data: Vec<String>) -> Self {
-		// getting max x& y
-		let mut x = 0;
-		let mut y = 0;
-		getmaxyx(win, &mut y, &mut x);
+		// drawing the contents of `Data`
+		d.setup();
 
-		// creating struct
-		Display {
-            parent: None,
-			window: win,
-			data,
-			title,
-			xoffset: 0,
-			yoffset: 0,
-			xsize: x,
-			ysize: y,
-		}
-    }
-
-	/// draws this [`Display`] to the screen.
-	pub fn draw(&self) {
-		// rendering the data in the window given to the function
-		let row_cap: i32 = std::cmp::min(self.ysize, self.data.len().try_into().unwrap_or(0));
-
-		// drawing all display's contents
-		for i in 0..row_cap {
-            // borrowing the string from the array
-            let s: &String = &self.data[i as usize];
-
-            // getting a string slice
-            let sslice = &self.slice_upto_window(s);
-
-            // writing the slice
-			mvwprintw(self.window, self.yoffset + i, self.xoffset, sslice);
-        }
-
-        // refreshing the window
-        wrefresh(self.window);
+		// returning
+		d
 	}
 
-    fn slice_upto_window(&self, s: &String) -> String {
-        // taking the minimum value (don't want to write beyond the window)
-        let len: usize = std::cmp::min(self.xsize as usize, s.len());
+	/// This function draws the contents of `Display.data` onto the pad
+	fn setup(&self) {
+		for i in 0..(self.data.len() as i32) {
+			// borrowing the string from the array
+			let s: &String = &self.data[i as usize];
+			let l = s.len().try_into().unwrap_or(0);
 
-        // forming a slice and returning it
-        String::from(&s[0..len])
-    }
+			// writing the slice
+			match self.pad.mvaddnstr(self.yoffset + i, self.xoffset, s, l) {
+				Ok(_) => (),
+				Err(e) => {
+					endwin();
+					panic!(
+						"Error in display.setup() calling pad.mvaddnstr({}, {}, {}, {}) = {}",
+						self.yoffset + i,
+						self.xoffset,
+						s,
+						l,
+						e
+					);
+				}
+			};
+		}
+	}
+
+	/// draws this [`Display`] to the screen.
+	pub fn refresh(&self) {
+		match self.pad.refresh(0, 0, self.ysize - 1, self.xsize) {
+			Ok(_) => (),
+			Err(e) => {
+				endwin();
+				println!(
+					"Error in display.refresh() calling pad.refresh({}, {}, {}, {}) = {}",
+					0,
+					0,
+					self.ysize - 1,
+					self.xsize,
+					e
+				);
+			}
+		}
+	}
+
+	/// Calls the internal [`Pad`]'s getch.
+	pub fn getch(&self) {
+		match self.pad.getch() {
+			Ok(_) => (),
+			Err(e) => {
+				endwin();
+				panic!("Error in display.getch() calling pad.getch() = {}", e)
+			}
+		};
+	}
 }
 

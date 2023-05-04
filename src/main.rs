@@ -1,31 +1,32 @@
-extern crate ncurses;
 
+// global modules
+extern crate pancurses;
+
+// global imports
+use pancurses::*;
+
+// local modules
 mod gui;
 mod core;
-use ncurses::*;
 
+// local imports
 use self::core::data::random_data;
 use self::gui::display::Display;
 
 fn main() {
-		/* Setup ncurses. */
-		initscr();
-		raw();
-
-        // the main window
-        let win: WINDOW = stdscr();
-
-		/* Allow for extended keyboard (like F1). */
-		keypad(win, true);
+		// making the root window
+        let root: Window = initscr();
 		noecho();
+        cbreak();
 
         // creating a display object from the main window
-        let d = Display::from_window(win, String::from("Title"), random_data(50, 16));
-        d.draw();
+        let d = Display::new(&root, String::from("Title"), random_data(300, 32));
+        d.refresh();
 
-        wrefresh(win);
+        // awaiting keyboard input
+        d.getch();
 
-        wgetch(win);
+        // terminating the window
 		endwin();
 }
 
