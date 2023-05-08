@@ -2,7 +2,7 @@
 
 extern crate pancurses;
 
-use super::pad::Pad;
+use super::{pad::Pad, scrollable::Scrollable};
 use pancurses::*;
 
 #[derive(Debug)]
@@ -15,6 +15,9 @@ pub struct Display {
 	yoffset: i32,
 	xsize: i32,
 	ysize: i32,
+
+	// scrolling functionality
+	index: i32,
 }
 
 impl Display {
@@ -42,6 +45,7 @@ impl Display {
 			yoffset: 0,
 			xsize: x / 3,
 			ysize: y,
+			index: 0,
 		};
 
 		// drawing the contents of `Data`
@@ -59,49 +63,129 @@ impl Display {
 			let l = s.len().try_into().unwrap_or(0);
 
 			// writing the slice
-			match self.pad.mvaddnstr(self.yoffset + i, self.xoffset, s, l) {
-				Ok(_) => (),
-				Err(e) => {
-					endwin();
-					panic!(
-						"Error in display.setup() calling pad.mvaddnstr({}, {}, {}, {}) = {}",
-						self.yoffset + i,
-						self.xoffset,
-						s,
-						l,
-						e
-					);
-				}
-			};
+			self.pad
+				.mvaddnstr(self.yoffset + i, self.xoffset, s, l)
+				.expect(&format!(
+					"Error in display.setup() calling pad.mvaddnstr({}, {}, {}, {})",
+					self.yoffset + i,
+					self.xoffset,
+					s,
+					l
+				));
 		}
+
+		// highlighting the first line
+		self.pad.set_highlight(0).expect({
+			endwin();
+			"Error in display.setup(), highlighting line 0 of pad"
+		});
 	}
+
+    /// Makes a call to the internal [`Pad`] to write a `n` bytes of a string to an `(y, x)` location.
+    pub fn mvaddnstr(&self, y: i32, x: i32, s: &String, n: i32) -> Result<(), i32> {
+        self.pad.mvaddnstr(y, x, s, n)
+    }
 
 	/// draws this [`Display`] to the screen.
 	pub fn refresh(&self) {
-		match self.pad.refresh(0, 0, self.ysize - 1, self.xsize) {
-			Ok(_) => (),
-			Err(e) => {
-				endwin();
-				println!(
-					"Error in display.refresh() calling pad.refresh({}, {}, {}, {}) = {}",
-					0,
-					0,
-					self.ysize - 1,
-					self.xsize,
-					e
-				);
-			}
-		}
+		let scroll_mod = match self.index > (self.ysize - 1) {
+			true => std::cmp::min(
+				self.index - self.ysize + 1,
+				self.data.len() as i32 - self.ysize,
+			),
+			false => 0,
+		};
+
+		self.pad
+			.refresh(scroll_mod, 0, 0, 0, self.ysize - 1, self.xsize)
+			.expect(&format!(
+				"Error in display.refresh() calling pad.refresh({}, {}, {}, {}, {}, {})",
+				scroll_mod,
+				0,
+				0,
+				0,
+				self.ysize - 1,
+				self.xsize
+			))
 	}
 
 	/// Calls the internal [`Pad`]'s getch.
-	pub fn getch(&self) {
-		match self.pad.getch() {
-			Ok(_) => (),
-			Err(e) => {
-				endwin();
-				panic!("Error in display.getch() calling pad.getch() = {}", e)
+	pub fn getch(&self) -> Option<Input> {
+		self.pad
+			.getch()
+			.expect("Error in display.getch() calling pad.getch() = {}")
+	}
+
+	pub fn keypad(&self, state: bool) {
+		self.pad
+			.keypad(state)
+			.expect("Error in display.keypad() calling pad.keypad()");
+	}
+
+    /// Makes a call to the internal `Pad` object which "moves" the cursor up one line (within
+    /// the boundaries of the window.
+	pub fn scroll_up(&mut self) {
+		let new = std::cmp::max(self.index - 1, 0);
+
+		// setting the old index to normal
+		self.pad.remove_highlight(self.index).expect({
+			endwin();
+			&format!(
+				"Error in display.scroll_up(), highlighting line {} of pad",
+				self.index
+			)
+		});
+
+		// setting the new index to normal
+		self.pad.set_highlight(new).expect({
+			endwin();
+			&format!(
+				"Error in display.scroll_up(), highlighting line {} of pad",
+				new
+			)
+		});
+
+		// storing the new index
+		self.index = new;
+	}
+
+    /// Makes a call to the internal `Pad` object which "moves" the cursor down one line (within
+    /// the boundaries of the window.
+	pub fn scroll_down(&mut self) {
+		let new = std::cmp::min(self.index + 1, self.pad.dimensions().0 - 1);
+
+		// setting the old index to normal
+		self.pad.remove_highlight(self.index).expect({
+			endwin();
+			&format!(
+				"Error in display.scroll_down(), highlighting line {} of pad",
+				self.index
+			)
+		});
+
+		// setting the new index to normal
+		self.pad.set_highlight(new).expect({
+			endwin();
+			&format!(
+				"Error in display.scroll_down(), highlighting line {} of pad",
+				new
+			)
+		});
+
+		// storing the new index
+		self.index = new;
+	}
+}
+
+//// Trait implementations for [`Display`]
+
+impl Drop for Display {
+	fn drop(&mut self) {
+		return match& self.parent {
+			Some(win) => {
+				drop(win);
 			}
+			None => {}
 		};
 	}
 }
